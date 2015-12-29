@@ -13,5 +13,9 @@ irc.join_channels:
 - '#FIXME_yourfavoritechannelnamehere'
 plugins.path:
 - /var/lib/rbot/plugins
+- /var/lib/rbot/plugins/rbot-gentoo
 core.db: tc
 log.level: 3
+
+gentoo.scriptdir: /var/lib/rbot/plugins/rbot-gentoo/gentoo-scripts
+gentoo.python: /usr/bin/python2.7
