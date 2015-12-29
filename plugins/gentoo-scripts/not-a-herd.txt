@@ -1,0 +1,8 @@
+infra (Gentoo Infrastructure) is not a herd. infra is a team. See http://www.gentoo.org/proj/en/infrastructure/ for a list of team members.
+security (Gentoo Linux Security Project) is not a herd. For a complete listing of security members see http://security.gentoo.org
+pr (Gentoo Public Relations Project) is not a herd. For a complete listing of people on that team visit http://www.gentoo.org/proj/en/pr
+qa (Gentoo Quality Assurance) is not a herd. For a semi complete listing of people on that team visit http://www.gentoo.org/proj/en/qa
+forums (Gentoo Linux Forums) is not a herd. For a complete listing of people on that team visit http://www.gentoo.org/proj/en/forums
+releng (Release Engineering) is not a herd. For a semi complete listing of people on that team visit http://www.gentoo.org/proj/en/releng
+treecleaners (TreeCleaners) is not a herd. it is a qa subproject.  For a semi complete listing of people on that team visit http://www.gentoo.org/proj/en/qa/treecleaners
+no-herd (No Herd) is not a herd. It should be removed from metadata.xml.

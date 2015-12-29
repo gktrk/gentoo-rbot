@@ -1,0 +1,55 @@
+devaway INPUT
+-------------
+1. Set $who to 'list'
+2. If any username, validate and set in $who
+2. http://dev.gentoo.org/devaway/index-csv.php?who=$who
+
+glsa INPUT
+----------
+0. Validate input. Valid chars: "-1234567890"
+1. Take exact GLSA string (200710-30)
+2. Display title and CAN/CVE reference.
+
+glsa -s INPUT
+-------------
+1. Validate input. Valid chars: "./>=-1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+2. glsa-check --nocolor -l 2> /dev/null | grep -i -- "$input" | sort -rn 
+
+earch PACKAGE
+-------------
+1. Validate input. Valid chars: "./>=-1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+2. Use earch.sh tool.
+
+expn ALIAS
+----------
+wget -O - -q http://dev.gentoo.org/~solar/.alias | grep ^${arg}
+
+ddep PACKAGE
+------------
+1. Validate against http://qa-reports.gentoo.org/output/genrdeps/dindex/.dindex
+2. http://qa-reports.gentoo.org/output/genrdeps/dindex/${CAT}/${PN}
+3. See grabrdeps.sh
+
+rdep PACKAGE
+------------
+1. Validate against http://qa-reports.gentoo.org/output/genrdeps/dindex/.dindex
+2. http://qa-reports.gentoo.org/output/genrdeps/rindex/${CAT}/${PN}
+3. See grabrdeps.sh
+
+maintainer PACKAGE
+------------------
+see maintainer.py
+
+metadata PACKAGE
+----------------
+see metadata.py
+
+herds ....
+-----
+1. On a timer, call herds.sh to update the herds.xml
+2. see herds.py
+3. See not-a-herd.txt as well
+
+changelog ....
+---------
+see changelog.py

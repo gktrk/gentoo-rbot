@@ -1,0 +1,376 @@
+#!/usr/bin/python -O
+#
+# $Header: $
+# Authors:
+# Eldad Zack <eldad@gentoo.org> - Original application
+# Robin H. Johnson <robbat2@gentoo.org> - SLOT and masking support, and many
+# other improvements.
+#
+# Present Maintainer: robbat2@gentoo.org
+#
+# earch: Gentoo last arch keyword checking tool, with SLOT and masking support
+# version 0.9.5
+
+import sys
+import os
+import re
+import string
+import readline
+import getopt
+from portage.output import *
+
+# we import portage later
+sys.path.insert(0, "/usr/lib/portage/pym")
+
+version = '0.9'
+
+def earch_main():
+
+	# force to false
+	opt_masking_reasons = False
+	opt_hide_masked = False
+	opt_category = False
+	opt_nocolor = False
+	opt_help = False
+ 	opt_remove_pkgs = False
+ 	opt_one_slot = False
+	opt_ignore_redundant = False
+	opt_follow_etc_portage = False
+	opt_version = False
+	opt_quiet = False
+	opt_slot = []
+	# process commandline
+	try:
+		(opts,args) = getopt.gnu_getopt(sys.argv[1:],'CcfhHims:orv',['nocolor','quiet','category','masking-reasons','help','hide-masked','version','slot=','remove-pkgs','ignore-redundant','follow-etc-portage'])
+		for optkey,optvalue in opts:
+			if optkey == '--nocolor':
+				opt_nocolor = True
+			if optkey == '--quiet':
+				opt_quiet = True
+			if optkey == '-c' or optkey == '--category':
+				opt_category = True
+			if optkey == '-f' or optkey == '--follow-etc-portage':
+				opt_follow_etc_portage = True
+			if optkey == '-m' or optkey == '--masking-reasons':
+				opt_masking_reasons = True
+			if optkey == '-h' or optkey == '--help':
+				opt_help = True
+			if optkey == '-H' or optkey == '--hide-masked':
+				opt_hide_masked = True
+			if optkey == '-i' or optkey == '--ignore-redundant':
+				opt_ignore_redundant = True
+			if optkey == '-o' or optkey == '--one-slot':
+				opt_one_slot = True
+			if optkey == '-r' or optkey == '--remove-pkgs':
+				opt_remove_pkgs = True
+			if optkey == '-s' or optkey == '--slot':
+				opt_slot = re.split(',',optvalue)
+			if optkey == '-v' or optkey == '--version':
+				opt_version = True
+	except getopt.GetoptError:
+		opt_help = True
+
+	# don't hide masked packages if we are printing reasons
+	if opt_masking_reasons:
+		opt_hide_masked = False
+	# do help
+	if opt_help:
+		earch_help()
+		return
+	# version output
+	if opt_version:
+		earch_version()
+		return
+
+	if not opt_follow_etc_portage:
+		# this is a cheat to get portage to ignore local user profiles
+		# it must come before the portage module is imported
+		os.environ["PORTAGE_CALLER"]="repoman"
+
+	# generate
+	(ebuildlist,ebuilddata,pkgkeywords) = earch_data_generate(args,slots=opt_slot,hide_masked=opt_hide_masked,include_category=opt_category,ignore_redundant=opt_ignore_redundant,one_slot=opt_one_slot,nocolor=opt_nocolor,quiet=opt_quiet)
+
+	if opt_remove_pkgs:
+		earch_remove_pkgs(ebuildlist,ebuilddata,pkgkeywords)
+		return
+
+	earch_data_output(ebuildlist,ebuilddata,pkgkeywords,show_masking_reason=opt_masking_reasons)
+
+def earch_version():
+	print 'earch %s' % (version)
+
+def earch_help():
+	earch_version
+	#'chHmrs:v',['category','masking-reasons','help','hide-masked','version','slot=','remove-pkgs'])
+	print 'Gentoo last arch keyword checking tool, with SLOT and masking support'
+	print
+	print 'Usage:'
+	print 'earch [opts] [CP]'
+	print 'If CP is omitted, the current directory is used.'
+	print
+	print 'Options:'
+	print '-c|--category'
+	print '  Include category in output.'
+	print
+	print '-f|--follow-etc-portage'
+	print '  By default, earch acts like repoman and ignores /etc/portage.'
+	print '  This option disables that behavior.'
+	print
+	print '-h|--help'
+	print '  This help page.'
+	print
+	print '-H|--hide-masked'
+	print '  Exclude all masked versions from output.'
+	print
+	print '-i|--ignore-redundant'
+	print '  Exclude redudant versions from keyword output.'
+	print '  Redundant versions are those output by -r.'
+	print
+	print '-m|--masking-reason'
+	print '  For all masked versions, print masking reason. '
+	print '  Disables other output.'
+	print
+	print '-o|--one-slot'
+	print '  Consider SLOT values as if they were all equal.'
+	print '  This effectively disables SLOTs from consideration.'
+	print
+	print '-r|--remove-pkgs'
+	print '  Show all redundant versions to clean from the tree.' 
+	print
+	print '-s|--slot <SLOT,...>'
+	print '  SLOT values to provide output for, seperated by commas.'
+	print
+	print '--nocolor'
+	print '  Disable ANSI color output'
+	print
+	print '--quiet'
+	print '  Squelch Portage python warnings'
+	print
+	print '-v|--version'
+	print '  earch version output.'
+	print
+	print 'Explaination of output:'
+	print '# earch [$CATEGORY/$PN]'
+	print '$PF[$SLOT]: $KEYWORDS'
+	print 'If a specific version is masked, a (M) will preceed the keywords.'
+
+def earch_manual_getkeywords(pkg):
+	file = open(pkg + ".ebuild")
+	for line in file.readlines():
+		line = string.rstrip(line)
+		if re.match("^KEYWORDS=",line):
+			keywords = re.split("\"",line)[1]
+			file.close
+			return re.split(" ",keywords)
+
+def earch_data_generate(args,slots=[],hide_masked=False,include_category=False,ignore_redundant=False,one_slot=False,nocolor=False,quiet=False):
+	# This makes portage really quiet	
+	stderr = sys.stderr
+	if quiet:
+		sys.stderr = open('/dev/null', 'w')
+	import portage
+	# and reset it
+	sys.stderr = stderr
+		
+	# disable color as needed
+	# this is actually out of place, but still the best place to run it
+	# to avoid importing portage twice
+	if nocolor:
+		portage.settings.unlock()
+		portage.settings["NOCOLOR"] = '1'
+		portage.settings.lock()
+	if (not sys.stdout.isatty()) or (portage.settings["NOCOLOR"] in ["yes","true","1"]):
+	        portage.output.nocolor()
+
+	portdir = portage.settings["PORTDIR"]
+	portdb = portage.portdbapi(None, portage.settings)
+	archslotdict = {}
+	ebuildlist = []
+	ebuilddata = {}
+	pkgkeywords = {}
+
+	if len(args) < 1:
+		workdir = "."
+	else:
+		workdir = portdir + "/" + args[0]
+		try:
+			pkg = portage.portdb.xmatch("match-all", args[0])
+			catpkg = portage.pkgsplit(pkg[0])[0]
+			workdir = portdir + "/" + catpkg
+		except:
+			pass
+
+		try:
+			os.chdir(workdir)
+		except:
+			print red("!!!" + " Can't find " + workdir)
+			sys.exit(1)
+
+	cp_path = os.path.abspath(workdir)
+	cp = re.sub(portdir+'/?','', cp_path, count=1)
+	#print cp
+	cat = re.split('/',cp)[0]
+	#print c
+
+	for file in os.listdir(workdir):
+		if re.search("\.ebuild$",file):
+			s = re.split("\.ebuild$",file)[0]
+			ebuildlist.append(s)
+
+	ebuildlist.sort(lambda x,y: portage.pkgcmp(portage.pkgsplit(x),portage.pkgsplit(y)))
+
+	ebuildlist2 = []
+	for pkg in ebuildlist:
+		cpv = cat+'/'+pkg
+		aux = portdb.aux_get(cpv,['SLOT','KEYWORDS'])
+		if one_slot:
+			slot = '0'
+		else:
+			slot = aux[0]
+		keywords = re.split(' ',aux[1])
+		raw_keywords = earch_manual_getkeywords(pkg)
+		masking = portage.getmaskingstatus(cpv)
+		is_masked = len(masking) > 0
+		if hide_masked and is_masked:
+			continue
+		if len(slots) > 0 and not slot in slots:
+			continue
+		if include_category:
+			pkg = cpv
+		effective_keywords = []
+		if len(masking) > 0:
+			prefix = 'M/'
+		else:
+			prefix = ''
+		for key in keywords:
+			if len(key) == 0:
+				#print 'Bad key!',pkg
+				continue
+			effective_keywords.append(prefix+key)
+			if key[0] != '-' and key[0] != '~':
+				effective_keywords.append(prefix+'~'+key)
+		ebuildlist2.append(pkg)
+		# store this for usage later
+		ebuilddata[pkg] = {'SLOT':slot, 'KEYWORDS':keywords, 'MASKING':masking, 'EFFECTIVE_KEYWORDS':effective_keywords,'RAW_KEYWORDS':raw_keywords}
+
+	ebuildlist = ebuildlist2
+
+	# build archslotdict
+	for pkg in ebuildlist:
+		slot = ebuilddata[pkg]['SLOT']
+		keywords = ebuilddata[pkg]['EFFECTIVE_KEYWORDS']
+		# ensure the second level tree exists
+		try:
+			archslotdict[slot]
+		except KeyError:
+			archslotdict[slot] = {}
+		# now actually populate the second level tree
+		for arch in keywords:
+			archslotdict[slot][arch] = pkg
+	
+
+	# build pkgkeywords from archslotdict
+	for pkg in ebuildlist:
+		slot = ebuilddata[pkg]['SLOT']
+		ek = ebuilddata[pkg]['EFFECTIVE_KEYWORDS']
+		tpk = {}
+		for value,key in archslotdict[slot].iteritems():
+			#value = re.sub('M/','',value)
+			if (key == pkg):
+				tpk[re.sub('M/','',value)] = True
+		# include all -arch and -* flags
+		for k in ek:
+			if k[0] == '-' or k[0:3] == 'M/-':
+				tpk[re.sub('M/','',k)] = True
+		pkgkeywords[pkg] = tpk.keys()
+
+	# clean out items we are ignoring
+	if ignore_redundant:
+		ebuildlist2 = []
+		for pkg in ebuildlist:
+			if len(pkgkeywords[pkg]) > 0:
+				ebuildlist2.append(pkg)
+		ebuildlist = ebuildlist2
+
+	# shorten the pkgkeywords to remove cases where a package is both ~arch
+	# and arch.
+	for pkg in ebuildlist:
+		keywords =  pkgkeywords[pkg]
+		newkeywords = []
+		for k in keywords:
+			if k[0] == '~' and k[1:] in keywords:
+				continue
+			else:
+				newkeywords.append(k)
+		pkgkeywords[pkg] = newkeywords
+	
+	# sort pkgkeywords to reflect the actual flags
+	for pkg in ebuildlist:
+		pk = pkgkeywords[pkg]
+		npk = pk
+		rk = ebuilddata[pkg]['RAW_KEYWORDS']
+		if rk is not None:
+			def earch_sort_cmp(x,y,src=rk):
+				if x is None and y is None:
+					return 0
+				elif x is None and y is not None:
+					return 1
+				elif x is not None and y is None:
+					return -1
+				# nobody is None
+				ix = src.index(x)
+				iy = src.index(y)
+				if(ix > iy):
+					return 1
+				elif(ix < iy):
+					return -1
+				else:
+					return 0
+			npk.sort(cmp=earch_sort_cmp)
+		pkgkeywords[pkg] = npk
+		
+	return (ebuildlist,ebuilddata,pkgkeywords)
+
+
+def earch_remove_pkgs(ebuildlist,ebuilddata,pkgkeywords):
+	for pkg in pkgkeywords.keys():
+		if len(pkgkeywords[pkg]) == 0:
+			print pkg
+
+def earch_data_output(ebuildlist,ebuilddata,pkgkeywords,show_masking_reason=False):
+
+	for pkg in ebuildlist:
+		slot = ebuilddata[pkg]['SLOT']
+		masking = ebuilddata[pkg]['MASKING']
+		is_masked = len(masking) > 0
+		if is_masked:
+			m = red(' (M)')
+		else:
+			m = ''
+		print '%s[%s]:%s'%(white(pkg),yellow(slot),m),
+		# print masking reason only
+		if show_masking_reason:
+			print '%s' % (string.join(masking,', '))
+			continue
+		earch_data_output_keywords(pkgkeywords[pkg])
+
+def earch_data_output_keywords(keywords):
+	# force -* to the first item
+	if '-*' in keywords:
+		earch_data_output_keyword('-*')
+	for value in keywords:
+		if value == '-*':
+			continue
+		earch_data_output_keyword(value)
+	print
+
+def earch_data_output_keyword(keyword):
+	if keyword[0] == '-':
+		print red(keyword),
+	elif keyword[0] == '~':
+		print blue(keyword),
+	else:
+		print green(keyword),
+
+if __name__ == "__main__":
+	earch_main()

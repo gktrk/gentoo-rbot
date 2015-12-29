@@ -1,0 +1,17 @@
+---
+auth.password: FIXME_secret
+core.address_prefix:
+- '!'
+core.reply_with_nick: false
+core.nick_postfix: ':'
+server.list:
+- irc://chat.freenode.net:7000
+server.ssl: true
+irc.nick: FIXME_yourbotnamegoeshere
+irc.user: FIXME_yourbotnamegoeshere
+irc.join_channels:
+- '#FIXME_yourfavoritechannelnamehere'
+plugins.path:
+- /var/lib/rbot/plugins
+core.db: tc
+log.level: 3
