@@ -1,3 +1,6 @@
 [submodule "plugins/rbot-gentoo"]
 	path = plugins/rbot-gentoo
 	url = git://anongit.gentoo.org/proj/rbot-gentoo.git
+[submodule "plugins/rbot-bugzilla"]
+	path = plugins/rbot-bugzilla
+	url = git://anongit.gentoo.org/proj/rbot-bugzilla.git
