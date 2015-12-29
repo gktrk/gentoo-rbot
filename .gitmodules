@@ -1,0 +1,3 @@
+[submodule "plugins/rbot-gentoo"]
+	path = plugins/rbot-gentoo
+	url = git://anongit.gentoo.org/proj/rbot-gentoo.git
