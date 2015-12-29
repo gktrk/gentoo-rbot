@@ -14,6 +14,7 @@ irc.join_channels:
 plugins.path:
 - /var/lib/rbot/plugins
 - /var/lib/rbot/plugins/rbot-gentoo
+- /var/lib/rbot/plugins/rbot-bugzilla
 core.db: tc
 log.level: 3
 
