@@ -12,11 +12,11 @@ irc.user: FIXME_yourbotnamegoeshere
 irc.join_channels:
 - '#FIXME_yourfavoritechannelnamehere'
 plugins.path:
-- gentoo-rbot/plugins
-- gentoo-rbot/plugins/rbot-gentoo
-- gentoo-rbot/plugins/rbot-bugzilla
+- plugins
+- plugins/rbot-gentoo
+- plugins/rbot-bugzilla
 core.db: tc
 log.level: 3
 
-gentoo.scriptdir: gentoo-rbot/plugins/rbot-gentoo/gentoo-scripts
+gentoo.scriptdir: plugins/rbot-gentoo/gentoo-scripts
 gentoo.python: /usr/bin/python2.7
